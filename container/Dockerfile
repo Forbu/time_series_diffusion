@@ -9,3 +9,4 @@ RUN curl -sSL https://install.python-poetry.org | python3 -
 RUN export PATH="/root/.local/bin:$PATH"
 
 RUN pip3 install lightning
+RUN pip3 install -U 'tensorboardX'

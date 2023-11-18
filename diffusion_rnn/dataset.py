@@ -78,7 +78,7 @@ class DiffusionTSDataset(Dataset):
         X, y = self.dataset[data_id]
 
         data_noisy, gradiant = add_noise_to_graph(
-            y,
+            np.array(y),
             self.mean_values[timestep],
             self.variance_values[timestep],
         )
