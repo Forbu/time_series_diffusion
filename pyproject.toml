@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "diffusion-rnn"
+version = "0.1.0"
+description = "test for time series diffusion"
+authors = ["Adrien Bufort"]
+license = "Apache 2.0"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
