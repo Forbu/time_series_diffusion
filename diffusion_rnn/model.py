@@ -7,6 +7,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 import lightning.pytorch as pl
+import torchmetrics
 
 from diffusion_rnn.dataset import DiffusionTSDataset
 
@@ -36,6 +37,9 @@ class RNNModel(pl.LightningModule):
 
         # loss function
         self.loss = nn.MSELoss()
+        
+        # define metric to track
+        self.train_loss = torchmetrics.MeanSquaredError()
 
     def forward(self, x, y, t_value):
         """
@@ -53,16 +57,18 @@ class RNNModel(pl.LightningModule):
         # we add the t_value
         x = torch.cat((x, t_value.repeat(1, shape_x[1] + shape_y[1], 1)), dim=2)
 
-        print(x.shape)
+        # print(x.shape)
 
         # first we apply the linear layer
         x = self.linear(x)
+        x = torch.relu(x)
 
         # we apply the LSTM layer
         x, _ = self.lstm(x)
 
         # now we take only the last forcast_step element
         x = x[:, -forcast_step:, :]
+        x = torch.relu(x)
 
         # we apply the output layer
         x = self.output(x)
@@ -81,21 +87,41 @@ class RNNModel(pl.LightningModule):
         gradiant_pred = self(x, y, t_value)
 
         loss = self.loss(gradiant_pred, gradiant)
+        
+        # metric to track
+        self.train_loss(loss)
 
         self.log("train_loss", loss)
 
         return loss
 
-    def on_epoch_end(self):
+    def on_train_epoch_end(self):
         """
         Function called at the end of the epoch
         """
+        # log the metric
+        self.log("train_loss_epoch", self.train_loss.compute())
+        
+        # reset the metric
+        self.train_loss.reset()
+        
         self.eval()
         with torch.no_grad():
-            x = torch.zeros((1, 4, self.dim_in)).float()
-            y = torch.randn(1, 4, self.dim_in) * torch.sqrt(
-                torch.tensor(self.dataset.variance_values[-1])
+            x = torch.zeros(
+                (
+                    1,
+                    self.dataset.nb_forecaststep + self.dataset.nb_backstep,
+                    self.dim_in,
+                )
             ).float()
+            y = (
+                torch.randn(
+                    1,
+                    self.dataset.nb_forecaststep,
+                    self.dim_in,
+                )
+                * torch.sqrt(torch.tensor(self.dataset.variance_values[-1])).float()
+            )
 
             for idx, time_step in enumerate(torch.flip(self.dataset.t_array, dims=[0])):
                 t_value = torch.tensor(time_step).unsqueeze(
@@ -116,6 +142,8 @@ class RNNModel(pl.LightningModule):
                     * noise
                 )
 
+            print(y)
+
     def configure_optimizers(self):
         """
         Configure the optimizer
@@ -127,14 +155,14 @@ class RNNModel(pl.LightningModule):
 if __name__ == "__main__":
     # we do the training here
 
-    dataset = DiffusionTSDataset(nb_backstep=4, nb_forecaststep=4, nb_time_step=100)
+    dataset = DiffusionTSDataset(nb_backstep=2, nb_forecaststep=2, nb_time_step=100)
 
-    dataloader = DataLoader(dataset, batch_size=32)
+    dataloader = DataLoader(dataset, batch_size=128)
 
-    model = RNNModel(dataset=dataset, dim_in=2, dim_out=2)
+    model = RNNModel(dataset=dataset, dim_in=2, dim_out=2, hidden_size=32)
 
     logger = pl.loggers.TensorBoardLogger("logs/", name="diffusion_rnn")
 
-    trainer = pl.Trainer(max_epochs=10, logger=logger, limit_train_batches=0.1)
+    trainer = pl.Trainer(max_epochs=20, logger=logger, gradient_clip_val=0.5)
 
     trainer.fit(model, dataloader)

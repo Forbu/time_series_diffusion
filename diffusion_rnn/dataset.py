@@ -60,6 +60,8 @@ class DiffusionTSDataset(Dataset):
         super().__init__()
         self.dataset = TSDataset(nb_backstep, nb_forecaststep)
         self.nb_time_step = nb_time_step
+        self.nb_backstep = nb_backstep
+        self.nb_forecaststep = nb_forecaststep
 
         self.t_array = torch.linspace(0, 1, nb_time_step)
         self.beta_values = generate_beta_value(MIN_BETA, MAX_BETA, self.t_array)
