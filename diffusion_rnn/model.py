@@ -89,7 +89,7 @@ class RNNModel(pl.LightningModule):
         loss = self.loss(gradiant_pred, gradiant)
         
         # metric to track
-        self.train_loss(loss)
+        self.train_loss(gradiant_pred, gradiant)
 
         self.log("train_loss", loss)
 
